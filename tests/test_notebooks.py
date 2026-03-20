@@ -5,6 +5,7 @@
 # you can obtain one at https://mozilla.org/MPL/2.0/.
 # Mozilla Public License, version 2.0
 
+# tests/test_notebooks.py
 from pathlib import Path
 
 import pytest

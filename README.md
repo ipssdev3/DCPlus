@@ -6,15 +6,12 @@
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 <!-- markdown-link-check-enable -->
 
-# Topology Optimization Engine
+# DCPlus
 
 -------
 ## About The Project
 
 This repo builds DCPlus loadflow solver implementation from Elia Group. This DCPlus loadflow solver is based on the paper "[Voltage-sensitive distribution factors for contingency analysis and topology optimization](https://arxiv.org/pdf/2509.19976)". It is a linearization around the N-0 AC loadflow and approximates the changes in the network by computing an equivalent to one AC Newton-Raphson iteration step.
-
-TODO: Add documentation link:
-Please check out our:
 
 ## Getting Started
 
@@ -68,7 +65,7 @@ If you use our work in scientific research, please cite [our paper on loadflowso
 
 
 
-Team – [georg.mensah@50hertz.com](mailto:georg.mensah@50hertz.com)
+Team – [loadflowsolver@eliagroup.eu](mailto:loadflowsolver@eliagroup.eu)
 
 ---
 

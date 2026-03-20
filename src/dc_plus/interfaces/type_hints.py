@@ -5,8 +5,10 @@
 # you can obtain one at https://mozilla.org/MPL/2.0/.
 # Mozilla Public License, version 2.0
 
-import dc_plus.place_holder
+"""Type hints for DC+ interfaces."""
 
+import typing
 
-def test_place_holder():
-    assert dc_plus.place_holder.place_holder()
+from jaxtyping import Int
+
+PosInt: typing.TypeAlias = Int

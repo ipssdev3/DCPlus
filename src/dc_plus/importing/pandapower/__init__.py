@@ -5,8 +5,4 @@
 # you can obtain one at https://mozilla.org/MPL/2.0/.
 # Mozilla Public License, version 2.0
 
-version: 3
-
-project:
-  name: "DCPlus"
-  team: "Sub-Chapter AI & Data Science"
+"""Pandapower import module."""

@@ -5,8 +5,8 @@
 # you can obtain one at https://mozilla.org/MPL/2.0/.
 # Mozilla Public License, version 2.0
 
-version: 3
+"""The numpy implementation for DC+.
 
-project:
-  name: "DCPlus"
-  team: "Sub-Chapter AI & Data Science"
+This implementation is intended for reference and testing purposes only.
+It is currently not optimized for performance, but for readability.
+"""
