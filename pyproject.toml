@@ -60,6 +60,9 @@ packages = [
 [project.optional-dependencies]
 pypowsybl = ["pypowsybl>=1.13.0"]
 pandapower = ["pandapower>=3.0.0"]
+interpss = [
+    "jpype1>=1.7.1",
+]
 
 [dependency-groups]
 dev = [
