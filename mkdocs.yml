@@ -15,6 +15,8 @@ strict: true
 nav:
   - Getting started:
     - Introduction: index.md
+    - Theory to implementation: theory_to_implementation.md
+    - Partial inverse LODF plan: partial_inverse_lodf_plan.md
 
 theme:
   name: material
