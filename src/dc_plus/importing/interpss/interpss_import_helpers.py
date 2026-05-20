@@ -394,24 +394,46 @@ def _load_config(config_path: str | None = None) -> dict:
 
 
 def _dframe_to_pandas(dframe: Any) -> pd.DataFrame:
-    """Convert an InterPSS (dflib) DataFrame to a pandas DataFrame."""
+    """Convert an InterPSS (dflib) DataFrame to a pandas DataFrame.
+
+    Uses dflib's primitive Series bulk array extraction (toDoubleArray / toIntArray)
+    to avoid per-cell JNI string round-trips. Falls back to string conversion for
+    non-numeric columns.
+    """
     n_cols = dframe.width()
     n_rows = dframe.height()
     col_index = dframe.getColumnsIndex()
     col_names = [str(col_index.get(i)) for i in range(n_cols)]
 
+    DoubleSeries = jpype.JClass("org.dflib.DoubleSeries")
+    IntSeries = jpype.JClass("org.dflib.IntSeries")
+
     data = {}
     for c in range(n_cols):
         series = dframe.getColumn(c)
-        values = [str(series.get(r)) for r in range(n_rows)]
-        data[col_names[c]] = values
+
+        # Try primitive bulk extraction: one JNI call per column instead of O(n) per-cell calls
+        if isinstance(series, DoubleSeries):
+            data[col_names[c]] = np.array(series.toDoubleArray(), dtype=np.float64)
+        elif isinstance(series, IntSeries):
+            data[col_names[c]] = np.array(series.toIntArray(), dtype=np.int64)
+        else:
+            # String / mixed columns: try castAsDouble first, then fall back to string
+            try:
+                ds = series.castAsDouble()
+                data[col_names[c]] = np.array(ds.toDoubleArray(), dtype=np.float64)
+            except Exception:
+                values = [str(series.get(r)) for r in range(n_rows)]
+                data[col_names[c]] = values
 
     df = pd.DataFrame(data)
 
+    # Convert any remaining string columns to numeric where possible
     for col in df.columns:
-        try:
-            df[col] = pd.to_numeric(df[col])
-        except (ValueError, TypeError):
-            pass
+        if df[col].dtype == object:
+            try:
+                df[col] = pd.to_numeric(df[col])
+            except (ValueError, TypeError):
+                pass
 
     return df
