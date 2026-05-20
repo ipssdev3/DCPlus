@@ -130,7 +130,7 @@ def _load_interpss_test_grid(file_path: str, loader: Callable = load_ieee_cdf):
     return dynamic_info, string_info, jacobian_data, net, bus_id_to_index
 
 
-def _run_lodf_comparison(dynamic_info, string_info, jacobian_data, net, bus_id_to_index, pass_threshold=0.8):
+def _run_lodf_comparison(dynamic_info, string_info, jacobian_data, net, bus_id_to_index, pass_threshold=0.95):
     """Run JAX LODF kernel and compare against InterPSS N-1 AC analysis.
 
     Returns the pass rate (fraction of N-1 cases matching within tolerance).
