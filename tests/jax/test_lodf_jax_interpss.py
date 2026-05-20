@@ -11,11 +11,14 @@ Compares JAX LODF results against InterPSS AC N-1 analysis as ground truth.
 Both the solver input data and the reference come from the same InterPSS source,
 ensuring consistent unit conventions and data mapping.
 
-Available test cases are limited to IEEE CDF files present in the ipss-agent
-workspace. Currently only IEEE 118 is available.
+Supported test cases:
+- IEEE 118 bus (IEEE CDF format)
+- PSSE Texas 2000 / ACTIVSg2000 (PSSE RAW format)
+- PSSE Eastern Interconnect / OpenEI (PSSE RAW format)
 """
 
 import os
+from typing import Callable
 
 import jax
 import jax.numpy as jnp
@@ -32,6 +35,7 @@ from dc_plus.importing.interpss.interpss_import_helpers import (
     initialize_jvm,
     interpss_n1_analysis,
     load_ieee_cdf,
+    load_psse_raw,
     run_aclf,
 )
 from dc_plus.importing.interpss.interpss_import import (
@@ -54,25 +58,27 @@ _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 TESTDATA_DIR = os.path.join(_PROJECT_ROOT, "testdata")
 INTERPSS_CONFIG_PATH = os.path.join(_PROJECT_ROOT, "config", "config.json")
 IEEE118_PATH = os.path.join(TESTDATA_DIR, "ieee", "ieee118.ieee")
+TEXAS2K_PATH = os.path.join(TESTDATA_DIR, "psse", "ACTIVSg2000.RAW")
+OPENEI_PATH = os.path.join(TESTDATA_DIR, "psse", "Base_Eastern_Interconnect_515GW.RAW")
 
 
 def _ipss_test_data_available():
-    return os.path.isfile(IEEE118_PATH) and os.path.isfile(INTERPSS_CONFIG_PATH)
+    return os.path.isfile(INTERPSS_CONFIG_PATH)
 
 
 skip_if_no_ipss = pytest.mark.skipif(
     not _ipss_test_data_available(),
-    reason="ipss-agent test data not available",
+    reason="InterPSS config not available",
 )
 
 
-def _load_interpss_test_grid(file_path: str):
+def _load_interpss_test_grid(file_path: str, loader: Callable = load_ieee_cdf):
     """Load a network via InterPSS and return (dynamic_info, string_info, jacobian_data, net, bus_id_to_index).
 
     Also returns the raw AclfNet and bus ID mapping for N-1 analysis.
     """
     initialize_jvm(INTERPSS_CONFIG_PATH)
-    net = load_ieee_cdf(file_path)
+    net = loader(file_path)
     run_aclf(net)
 
     dfs = extract_dataframes(net)
@@ -124,33 +130,11 @@ def _load_interpss_test_grid(file_path: str):
     return dynamic_info, string_info, jacobian_data, net, bus_id_to_index
 
 
-@pytest.fixture(scope="module")
-def jvm():
-    """Start JVM once for the module."""
-    if not _ipss_test_data_available():
-        pytest.skip("ipss-agent test data not available")
-    initialize_jvm(INTERPSS_CONFIG_PATH)
+def _run_lodf_comparison(dynamic_info, string_info, jacobian_data, net, bus_id_to_index, pass_threshold=0.8):
+    """Run JAX LODF kernel and compare against InterPSS N-1 AC analysis.
 
-
-@skip_if_no_ipss
-def test_lodf_jax_interpss_ieee118(jvm):
-    """LODF JAX test for IEEE 118 bus using InterPSS-imported data.
-
-    This test:
-    1. Loads IEEE 118 via InterPSS IEEE CDF adapter
-    2. Runs AC loadflow via InterPSS
-    3. Imports network data into DCPlus format (including tap ratios)
-    4. Runs JAX LODF kernel for N-1 contingency analysis
-    5. Runs InterPSS N-1 AC analysis as ground truth
-    6. Compares JAX LODF results against InterPSS N-1 results
+    Returns the pass rate (fraction of N-1 cases matching within tolerance).
     """
-    # Step 1-3: InterPSS import + Jacobian
-    dynamic_info, string_info, jacobian_data, net, bus_id_to_index = _load_interpss_test_grid(IEEE118_PATH)
-
-    # Step 4: Validate base case dimensions
-    assert jacobian_data.jacobian.shape[0] == dynamic_info.n_pv_buses + 2 * dynamic_info.n_pq_buses
-
-    # Step 5: JAX LODF kernel setup
     j_inverse = jacobian_data.inverse_jacobian
     theta_actual = dynamic_info.bus_voltage_angles_rad
     vm_actual = dynamic_info.bus_voltage_magnitudes
@@ -190,9 +174,6 @@ def test_lodf_jax_interpss_ieee118(jvm):
     branch_pq_base[:, 2] = s_from.imag
     branch_pq_base[:, 3] = s_to.imag
 
-    n_branches = branch_from.size
-    branch_flow_jac = np.zeros((n_branches, 4, 4), dtype=jacobian_inv_np.dtype)
-
     angle_component_indices = np.asarray(jacobian_data.angle_component_indices, dtype=np.int32)
     magnitude_component_indices = np.asarray(jacobian_data.magnitude_component_indices, dtype=np.int32)
 
@@ -215,11 +196,11 @@ def test_lodf_jax_interpss_ieee118(jvm):
         bus_to_mon_index=jnp.arange(v_mag_hat.size, dtype=jnp.int32),
     )
 
-    # Step 6: InterPSS N-1 as ground truth
+    # InterPSS N-1 as ground truth
     outage_ids = [str(string_info.branch_ids[i]) for i in outage_candidates]
     n1_results = interpss_n1_analysis(net, outage_ids)
 
-    # Step 7: Compare
+    # Compare
     n_comparisons = 0
     n_passed = 0
     for pos, outage_idx in enumerate(outage_candidates):
@@ -228,8 +209,6 @@ def test_lodf_jax_interpss_ieee118(jvm):
         if outage_id not in n1_results:
             continue
         n1 = n1_results[outage_id]
-        # One-step NR may not converge but still gives valid linearized voltages.
-        # Always use the voltage results (matching pypowsybl one-step behavior).
 
         # Build InterPSS N-1 voltage vector in index order
         v_mag_n1 = np.zeros(v_mag_hat.size)
@@ -250,10 +229,50 @@ def test_lodf_jax_interpss_ieee118(jvm):
         if np.allclose(lf_res_voltage, v_ref_n1, atol=1e-4, rtol=5e-3):
             n_passed += 1
 
-    # At least 80% of N-1 cases should match within tolerance
     if n_comparisons > 0:
         pass_rate = n_passed / n_comparisons
-        assert pass_rate >= 0.8, (
+        assert pass_rate >= pass_threshold, (
             f"Only {n_passed}/{n_comparisons} ({pass_rate:.1%}) N-1 cases passed. "
-            f"Expected at least 80%."
+            f"Expected at least {pass_threshold:.0%}."
         )
+
+
+@pytest.fixture(scope="module")
+def jvm():
+    """Start JVM once for the module."""
+    if not _ipss_test_data_available():
+        pytest.skip("InterPSS config not available")
+    initialize_jvm(INTERPSS_CONFIG_PATH)
+
+
+@skip_if_no_ipss
+@pytest.mark.skipif(not os.path.isfile(IEEE118_PATH), reason="IEEE 118 file not found")
+def test_lodf_jax_interpss_ieee118(jvm):
+    """LODF JAX test for IEEE 118 bus using InterPSS-imported data."""
+    dynamic_info, string_info, jacobian_data, net, bus_id_to_index = _load_interpss_test_grid(
+        IEEE118_PATH, loader=load_ieee_cdf
+    )
+    assert jacobian_data.jacobian.shape[0] == dynamic_info.n_pv_buses + 2 * dynamic_info.n_pq_buses
+    _run_lodf_comparison(dynamic_info, string_info, jacobian_data, net, bus_id_to_index)
+
+
+@skip_if_no_ipss
+@pytest.mark.skipif(not os.path.isfile(TEXAS2K_PATH), reason="Texas2k PSSE file not found")
+def test_lodf_jax_interpss_texas2k(jvm):
+    """LODF JAX test for ACTIVSg2000 (Texas 2000) using InterPSS-imported data."""
+    dynamic_info, string_info, jacobian_data, net, bus_id_to_index = _load_interpss_test_grid(
+        TEXAS2K_PATH, loader=load_psse_raw
+    )
+    assert jacobian_data.jacobian.shape[0] == dynamic_info.n_pv_buses + 2 * dynamic_info.n_pq_buses
+    _run_lodf_comparison(dynamic_info, string_info, jacobian_data, net, bus_id_to_index)
+
+
+@skip_if_no_ipss
+@pytest.mark.skipif(not os.path.isfile(OPENEI_PATH), reason="OpenEI PSSE file not found")
+def test_lodf_jax_interpss_openei(jvm):
+    """LODF JAX test for Eastern Interconnect (OpenEI) using InterPSS-imported data."""
+    dynamic_info, string_info, jacobian_data, net, bus_id_to_index = _load_interpss_test_grid(
+        OPENEI_PATH, loader=load_psse_raw
+    )
+    assert jacobian_data.jacobian.shape[0] == dynamic_info.n_pv_buses + 2 * dynamic_info.n_pq_buses
+    _run_lodf_comparison(dynamic_info, string_info, jacobian_data, net, bus_id_to_index)
