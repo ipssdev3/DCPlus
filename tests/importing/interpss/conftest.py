@@ -3,13 +3,14 @@ import os
 import pandas as pd
 import pytest
 
-# Paths to ipss-agent resources
-IPSS_AGENT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "ipss-agent"))
-IEEE14_PATH = os.path.join(IPSS_AGENT_ROOT, "wspace", "data", "ieee", "Ieee14Bus", "ieee14.ieee")
-IEEE118_PATH = os.path.join(IPSS_AGENT_ROOT, "wspace", "data", "ieee", "Ieee118Bus", "ieee118.ieee")
-IEEE14_REF_DIR = os.path.join(IPSS_AGENT_ROOT, "wspace", "data", "ieee", "Ieee14Bus", "result")
+# Paths — test data lives in testdata/ at the repo root
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+TESTDATA_DIR = os.path.join(_PROJECT_ROOT, "testdata")
+IEEE14_PATH = os.path.join(TESTDATA_DIR, "ieee", "ieee14.ieee")
+IEEE118_PATH = os.path.join(TESTDATA_DIR, "ieee", "ieee118.ieee")
+IEEE14_REF_DIR = os.path.join(TESTDATA_DIR, "ieee", "ieee14_result")
 
-INTERPSS_CONFIG_PATH = os.path.join(IPSS_AGENT_ROOT, "config", "config.json")
+INTERPSS_CONFIG_PATH = os.path.join(_PROJECT_ROOT, "config", "config.json")
 
 
 def _ipss_agent_available():

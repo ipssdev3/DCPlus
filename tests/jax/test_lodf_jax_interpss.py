@@ -49,12 +49,11 @@ from dc_plus.preprocess.helper_functions import _find_bridges
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_platform_name", "cpu")
 
-# Paths
-IPSS_AGENT_ROOT = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "ipss-agent")
-)
-INTERPSS_CONFIG_PATH = os.path.join(IPSS_AGENT_ROOT, "config", "config.json")
-IEEE118_PATH = os.path.join(IPSS_AGENT_ROOT, "wspace", "data", "ieee", "Ieee118Bus", "ieee118.ieee")
+# Paths — test data lives in testdata/ at the repo root
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+TESTDATA_DIR = os.path.join(_PROJECT_ROOT, "testdata")
+INTERPSS_CONFIG_PATH = os.path.join(_PROJECT_ROOT, "config", "config.json")
+IEEE118_PATH = os.path.join(TESTDATA_DIR, "ieee", "ieee118.ieee")
 
 
 def _ipss_test_data_available():

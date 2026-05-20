@@ -351,8 +351,8 @@ def _load_config(config_path: str | None = None) -> dict:
     if config_path is None:
         config_path = os.environ.get("IPSS_CONFIG_PATH")
     if config_path is None:
-        # Try sibling ipss-agent directory
-        candidate = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "ipss-agent", "config", "config.json")
+        # Try testdata/interpss directory
+        candidate = os.path.join(os.path.dirname(__file__), "..", "..", "..", "config", "config.json")
         candidate = os.path.abspath(candidate)
         if os.path.isfile(candidate):
             config_path = candidate
